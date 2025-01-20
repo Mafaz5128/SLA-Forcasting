@@ -1,119 +1,151 @@
-import pandas as pd
 import streamlit as st
-import matplotlib.pyplot as plt
+import pandas as pd
 from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+import plotly.graph_objects as go
 
-# Function for yield prediction and visualization
-def yield_forecasting_app(df, sector, departure_date, split_date):
-    st.title("Yield Forecasting Application")
+def Xgboost_model(df, sector, departure_date, forecast_period_start, forecast_period_end):
+    # Filter data for the selected sector
+    df = df[df['Sector'] == sector]
 
-    # Filter data based on sector and departure date
-    st.write("### Data Overview")
-    df = df[(df['Sector'] == sector) & (df['Departure Date'] == departure_date)]
-    st.write(df.head())
+    # Group by 'Sale Date' and calculate average YLD USD and sum of PAX COUNT
+    df = df.groupby("Sale Date", as_index=False).agg(
+        Avg_YLD_USD=("YLD USD", "mean"),
+        Sum_PAX=("PAX COUNT", "sum")
+    )
 
-    # Convert Sale Date to datetime
-    df['Sale Date'] = pd.to_datetime(df['Sale Date'])
+    # Calculate Days Before Departure
+    df["Sale Date"] = pd.to_datetime(df["Sale Date"])
+    departure_date = pd.to_datetime(departure_date)
+    df["Days Before Departure"] = (departure_date - df["Sale Date"]).dt.days
+    df = df[df["Sale Date"] <= forecast_period_end]
+
+    # Cumulative PAX COUNT
+    df["Cumulative PAX COUNT"] = df["Sum_PAX"].cumsum()
 
     # Feature Engineering
-    df['Lag_1'] = df['Avg_YLD_USD'].shift(1)
-    df['Lag_3'] = df['Avg_YLD_USD'].shift(3)
-    df['MA_7'] = df['Avg_YLD_USD'].rolling(window=7).mean()
-    df['EWMA_7'] = df['Avg_YLD_USD'].ewm(span=7, adjust=False).mean()
-    df['EWMA_3'] = df['Avg_YLD_USD'].ewm(span=3, adjust=False).mean()
+    df["Lag_1"] = df["Avg_YLD_USD"].shift(1)
+    df["Lag_3"] = df["Avg_YLD_USD"].shift(3)
+    df["MA_7"] = df["Avg_YLD_USD"].rolling(window=7).mean()
+    df["EWMA_3"] = df["Avg_YLD_USD"].ewm(span=3, adjust=False).mean()
+    df["EWMA_7"] = df["Avg_YLD_USD"].ewm(span=7, adjust=False).mean()
 
-    # Drop rows with NaN values caused by lagging/rolling
+    # Drop rows with NaN values
     df.dropna(inplace=True)
 
     # Define features and target
-    X = df[['Lag_1', 'Lag_3', 'MA_7', 'EWMA_3', 'EWMA_7', 'Sum_PAX', 'Days Before Departure', 'Cumulative PAX COUNT']]
-    y = df['Avg_YLD_USD']
+    X = df[[
+        "Lag_1", "Lag_3", "MA_7", "EWMA_3", "EWMA_7", 
+        "Sum_PAX", "Days Before Departure", "Cumulative PAX COUNT"
+    ]]
+    y = df["Avg_YLD_USD"]
+    forecast_period_start = pd.to_datetime(forecast_period_start)
 
-    # Split the dataset
-    train_data = df[df['Sale Date'] <= split_date]
-    test_data = df[df['Sale Date'] > split_date]
+    # Split the dataset into training and testing sets
+    train_data = df[df["Sale Date"] <= forecast_period_start]
+    test_data = df[df["Sale Date"] > forecast_period_start]
 
     X_train = train_data[X.columns]
-    y_train = train_data['Avg_YLD_USD']
-    X_test = test_data[X.columns]
-    y_test = test_data['Avg_YLD_USD']
+    y_train = train_data["Avg_YLD_USD"]
 
-    # Initialize and train the model
-    model = XGBRegressor(objective='reg:squarederror')
+    X_test = test_data[X.columns]
+    y_test = test_data["Avg_YLD_USD"]
+
+    # Initialize and train the XGBoost model
+    model = XGBRegressor(objective="reg:squarederror")
     model.fit(X_train, y_train)
 
-    # Predictions
+    # Evaluate the model
     y_train_pred = model.predict(X_train)
     y_test_pred = model.predict(X_test)
 
-    # Performance Metrics
-    train_rmse = mean_squared_error(y_train, y_train_pred, squared=False)
-    test_rmse = mean_squared_error(y_test, y_test_pred, squared=False)
+    train_rmse = mean_squared_error(y_train, y_train_pred)
+    test_rmse = mean_squared_error(y_test, y_test_pred)
+    train_mae = mean_absolute_error(y_train, y_train_pred)
+    test_mae = mean_absolute_error(y_test, y_test_pred)
     train_r2 = r2_score(y_train, y_train_pred)
     test_r2 = r2_score(y_test, y_test_pred)
 
-    st.write("### Model Performance")
-    st.write(f"Training RMSE: {train_rmse:.2f}, R2: {train_r2:.2f}")
-    st.write(f"Testing RMSE: {test_rmse:.2f}, R2: {test_r2:.2f}")
+    st.write(f"Training RMSE: {train_rmse}, MAE: {train_mae}, R²: {train_r2}")
+    st.write(f"Testing RMSE: {test_rmse}, MAE: {test_mae}, R²: {test_r2}")
 
-    # Visualizations
-    train_data['Predicted YLD USD'] = y_train_pred
-    test_data['Predicted YLD USD'] = y_test_pred
+    # Add predictions to train and test dataframes
+    train_data["Predicted YLD USD"] = y_train_pred
+    test_data["Predicted YLD USD"] = y_test_pred
 
-    st.write("### Actual vs Predicted YLD USD")
-    plt.figure(figsize=(12, 6))
-    plt.plot(train_data['Sale Date'], train_data['Avg_YLD_USD'], label='Actual YLD USD (Train)', color='blue', alpha=0.6)
-    plt.plot(train_data['Sale Date'], train_data['Predicted YLD USD'], label='Predicted YLD USD (Train)', color='green', linestyle='--', alpha=0.8)
-    plt.plot(test_data['Sale Date'], test_data['Avg_YLD_USD'], label='Actual YLD USD (Test)', color='orange', alpha=0.6)
-    plt.plot(test_data['Sale Date'], test_data['Predicted YLD USD'], label='Predicted YLD USD (Test)', color='red', linestyle='--', alpha=0.8)
-    plt.xlabel('Sale Date')
-    plt.ylabel('YLD USD')
-    plt.title('Actual vs Predicted YLD USD over Time')
-    plt.legend()
-    plt.grid(True)
-    st.pyplot(plt)
+    # Create traces for the interactive plot
+    fig = go.Figure()
 
-    # Residual Plots
-    st.write("### Residuals")
-    train_data['Residuals'] = y_train - y_train_pred
-    plt.figure(figsize=(12, 6))
-    plt.scatter(train_data['Sale Date'], train_data['Residuals'], color='blue', alpha=0.6)
-    plt.axhline(0, color='black', linestyle='--')
-    plt.title('Residual Plot for Training Data')
-    plt.xlabel('Sale Date')
-    plt.ylabel('Residuals')
-    plt.grid(True)
-    st.pyplot(plt)
+    # Add training data
+    fig.add_trace(go.Scatter(
+        x=train_data["Sale Date"],
+        y=train_data["Avg_YLD_USD"],
+        mode="lines",
+        name="Actual (Train)",
+        line=dict(color="blue"),
+    ))
 
-    test_data['Residuals'] = y_test - y_test_pred
-    plt.figure(figsize=(12, 6))
-    plt.scatter(test_data['Sale Date'], test_data['Residuals'], color='red', alpha=0.6)
-    plt.axhline(0, color='black', linestyle='--')
-    plt.title('Residual Plot for Testing Data')
-    plt.xlabel('Sale Date')
-    plt.ylabel('Residuals')
-    plt.grid(True)
-    st.pyplot(plt)
+    fig.add_trace(go.Scatter(
+        x=train_data["Sale Date"],
+        y=train_data["Predicted YLD USD"],
+        mode="lines",
+        name="Predicted (Train)",
+        line=dict(color="green", dash="dot"),
+    ))
 
-# Streamlit app setup
-st.sidebar.title("Inputs")
-uploaded_file = st.sidebar.file_uploader("Upload Excel File", type=["xls", "xlsx"])
+    # Add testing data
+    fig.add_trace(go.Scatter(
+        x=test_data["Sale Date"],
+        y=test_data["Avg_YLD_USD"],
+        mode="lines",
+        name="Actual (Test)",
+        line=dict(color="orange"),
+    ))
 
-if uploaded_file:
-    # Load the dataset from the uploaded file
-    excel_data = pd.ExcelFile(uploaded_file)
+    fig.add_trace(go.Scatter(
+        x=test_data["Sale Date"],
+        y=test_data["Predicted YLD USD"],
+        mode="lines",
+        name="Predicted (Test)",
+        line=dict(color="red", dash="dot"),
+    ))
 
-    # Let the user select the sheet
-    sheet_name = st.sidebar.selectbox("Select Sheet", excel_data.sheet_names)
-    df = excel_data.parse(sheet_name)
+    # Update layout
+    fig.update_layout(
+        title="Actual vs Predicted YLD USD Over Time",
+        xaxis_title="Sale Date",
+        yaxis_title="YLD USD",
+        legend_title="Legend",
+        template="plotly_white",
+        hovermode="x unified",
+        width=1000,
+        height=600
+    )
 
-    # Let the user select sector from the unique sectors in the dataset
+    st.plotly_chart(fig)
+
+# Streamlit user interface
+st.title("XGBoost Model for Forecasting YLD USD")
+
+# File upload for CSV or Excel
+uploaded_file = st.file_uploader("Upload your dataset (CSV or Excel)", type=["csv", "xlsx"])
+
+if uploaded_file is not None:
+    if uploaded_file.name.endswith('.csv'):
+        df = pd.read_csv(uploaded_file)
+    else:
+        # If the file is Excel, load it and let the user select a sheet
+        xls = pd.ExcelFile(uploaded_file)
+        sheet_names = xls.sheet_names
+        sheet_name = st.selectbox("Select Sheet", sheet_names)
+        df = pd.read_excel(xls, sheet_name=sheet_name)
+
+    # Inputs
     sector = st.sidebar.selectbox("Select Sector", df['Sector'].unique())
+    departure_date = st.sidebar.date_input("Departure Date")
+    forecast_period_start = st.sidebar.date_input("Forecast Period Start")
+    forecast_period_end = st.sidebar.date_input("Forecast Period End")
 
-    # Manual date inputs for departure_date and split_date
-    departure_date = st.sidebar.date_input("Select Departure Date")
-    split_date = st.sidebar.date_input("Select Train-Test Split Date")
-
-    # Call the forecasting function
-    yield_forecasting_app(df, sector, departure_date, split_date)
+    # Run the model
+    if st.sidebar.button("Run Model"):
+        Xgboost_model(df, sector, departure_date, forecast_period_start, forecast_period_end)
