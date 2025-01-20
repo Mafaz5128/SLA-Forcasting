@@ -127,9 +127,9 @@ st.title("XGBoost Airline Yield Prediction")
 st.write("This application allows you to forecast airline yield using XGBoost.")
 
 # File upload
-uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+uploaded_file = st.file_uploader("Upload your Excel file (.xlsx)", type=["xlsx"])
 if uploaded_file is not None:
-    df = pd.read_csv(uploaded_file)
+    df = pd.read_excel(uploaded_file) 
 
     # Select parameters
     sector = st.selectbox("Select Sector", df["Sector"].unique())
