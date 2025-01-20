@@ -3,7 +3,11 @@ import pandas as pd
 from xgboost import XGBRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import plotly.graph_objects as go
-
+st.set_page_config(
+    page_title="Station Revenue Analysis Dashboard",
+    page_icon=":chart_with_upwards_trend:",
+    layout="wide"
+)
 def Xgboost_model(df, sector, departure_date, forecast_period_start, forecast_period_end):
     # Convert 'Sale Date' to datetime if it's not already in datetime format
     df["Sale Date"] = pd.to_datetime(df["Sale Date"])
