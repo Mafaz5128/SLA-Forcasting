@@ -71,9 +71,6 @@ def Xgboost_model(df, sector, departure_date, forecast_period_start, forecast_pe
     train_r2 = r2_score(y_train, y_train_pred)
     test_r2 = r2_score(y_test, y_test_pred)
 
-    st.write(f"Training RMSE: {train_rmse}, MAE: {train_mae}, R²: {train_r2}")
-    st.write(f"Testing RMSE: {test_rmse}, MAE: {test_mae}, R²: {test_r2}")
-
     # Add predictions to train and test dataframes
     train_data["Predicted YLD USD"] = y_train_pred
     test_data["Predicted YLD USD"] = y_test_pred
