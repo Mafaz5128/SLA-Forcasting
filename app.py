@@ -111,9 +111,9 @@ if uploaded_file:
     # Let the user select sector from the unique sectors in the dataset
     sector = st.sidebar.selectbox("Select Sector", df['Sector'].unique())
 
-    # Let the user select dates
-    departure_date = st.sidebar.date_input("Select Departure Date", min_value=df['Departure Date'].min(), max_value=df['Departure Date'].max())
-    split_date = st.sidebar.date_input("Select Train-Test Split Date", min_value=df['Sale Date'].min(), max_value=df['Sale Date'].max())
+    # Manual date inputs for departure_date and split_date
+    departure_date = st.sidebar.date_input("Select Departure Date")
+    split_date = st.sidebar.date_input("Select Train-Test Split Date")
 
     # Call the forecasting function
     yield_forecasting_app(df, sector, departure_date, split_date)
