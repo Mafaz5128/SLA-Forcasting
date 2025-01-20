@@ -81,48 +81,7 @@ def RF_Model(df, sector, departure_date, forecast_period_start, forecast_period_
     train_data["Predicted YLD USD"] = y_train_pred
     test_data["Predicted YLD USD"] = y_test_pred
 
-    # Create traces for the interactive plot
-    fig = go.Figure()
-
-    # Add training data (without predicted line)
-    fig.add_trace(go.Scatter(
-        x=train_data["Sale Date"],
-        y=train_data["Avg_YLD_USD"],
-        mode="lines",
-        name="Actual (Train)",
-        line=dict(color="blue"),
-    ))
-
-    # Add testing data
-    fig.add_trace(go.Scatter(
-        x=test_data["Sale Date"],
-        y=test_data["Avg_YLD_USD"],
-        mode="lines",
-        name="Actual (Test)",
-        line=dict(color="orange"),
-    ))
-
-    fig.add_trace(go.Scatter(
-        x=test_data["Sale Date"],
-        y=test_data["Predicted YLD USD"],
-        mode="lines",
-        name="Predicted (Test)",
-        line=dict(color="red", dash="dot"),
-    ))
-
-    # Update layout
-    fig.update_layout(
-        title="Actual vs Predicted YLD USD Over Time",
-        xaxis_title="Sale Date",
-        yaxis_title="YLD USD",
-        legend_title="Legend",
-        template="plotly_white",
-        hovermode="x unified",
-        width=1000,
-        height=600
-    )
-
-    st.plotly_chart(fig)
+    return train_data, test_data
 
 def Xgboost_model(df, sector, departure_date, forecast_period_start, forecast_period_end):
     # Convert 'Sale Date' to datetime if it's not already in datetime format
@@ -193,48 +152,7 @@ def Xgboost_model(df, sector, departure_date, forecast_period_start, forecast_pe
     train_data["Predicted YLD USD"] = y_train_pred
     test_data["Predicted YLD USD"] = y_test_pred
 
-    # Create traces for the interactive plot
-    fig = go.Figure()
-
-    # Add training data (without predicted line)
-    fig.add_trace(go.Scatter(
-        x=train_data["Sale Date"],
-        y=train_data["Avg_YLD_USD"],
-        mode="lines",
-        name="Actual (Train)",
-        line=dict(color="blue"),
-    ))
-
-    # Add testing data
-    fig.add_trace(go.Scatter(
-        x=test_data["Sale Date"],
-        y=test_data["Avg_YLD_USD"],
-        mode="lines",
-        name="Actual (Test)",
-        line=dict(color="orange"),
-    ))
-
-    fig.add_trace(go.Scatter(
-        x=test_data["Sale Date"],
-        y=test_data["Predicted YLD USD"],
-        mode="lines",
-        name="Predicted (Test)",
-        line=dict(color="red", dash="dot"),
-    ))
-
-    # Update layout
-    fig.update_layout(
-        title="Actual vs Predicted YLD USD Over Time",
-        xaxis_title="Sale Date",
-        yaxis_title="YLD USD",
-        legend_title="Legend",
-        template="plotly_white",
-        hovermode="x unified",
-        width=1000,
-        height=600
-    )
-
-    st.plotly_chart(fig)
+    return train_data, test_data
 
 # Streamlit user interface
 st.title("Revenue Analysis: XGBoost and Random Forest Models")
@@ -261,10 +179,119 @@ if uploaded_file is not None:
     # Model selection
     model_type = st.sidebar.radio("Select Model", ("XGBoost", "Random Forest"))
 
-    # Run the selected model
+    # Run the selected model and display results
     if model_type == "XGBoost":
         if st.sidebar.button("Run XGBoost Model"):
-            Xgboost_model(df, sector, departure_date, forecast_period_start, forecast_period_end)
+            train_data, test_data = Xgboost_model(df, sector, departure_date, forecast_period_start, forecast_period_end)
+
+            # Create tabs for the chart and the tables
+            tab1, tab2 = st.tabs(["Chart", "Table"])
+
+            with tab1:
+                # Create traces for the interactive plot
+                fig = go.Figure()
+
+                # Add training data (without predicted line)
+                fig.add_trace(go.Scatter(
+                    x=train_data["Sale Date"],
+                    y=train_data["Avg_YLD_USD"],
+                    mode="lines",
+                    name="Actual (Train)",
+                    line=dict(color="blue"),
+                ))
+
+                # Add testing data
+                fig.add_trace(go.Scatter(
+                    x=test_data["Sale Date"],
+                    y=test_data["Avg_YLD_USD"],
+                    mode="lines",
+                    name="Actual (Test)",
+                    line=dict(color="orange"),
+                ))
+
+                fig.add_trace(go.Scatter(
+                    x=test_data["Sale Date"],
+                    y=test_data["Predicted YLD USD"],
+                    mode="lines",
+                    name="Predicted (Test)",
+                    line=dict(color="red", dash="dot"),
+                ))
+
+                # Update layout
+                fig.update_layout(
+                    title="Actual vs Predicted YLD USD Over Time",
+                    xaxis_title="Sale Date",
+                    yaxis_title="YLD USD",
+                    legend_title="Legend",
+                    template="plotly_white",
+                    hovermode="x unified",
+                    width=1000,
+                    height=600
+                )
+
+                st.plotly_chart(fig)
+
+            with tab2:
+                st.subheader("Train Data: Actual vs Predicted")
+                st.dataframe(train_data[["Sale Date", "Avg_YLD_USD", "Predicted YLD USD"]])
+
+                st.subheader("Test Data: Actual vs Predicted")
+                st.dataframe(test_data[["Sale Date", "Avg_YLD_USD", "Predicted YLD USD"]])
+
     elif model_type == "Random Forest":
         if st.sidebar.button("Run Random Forest Model"):
-            RF_Model(df, sector, departure_date, forecast_period_start, forecast_period_end)
+            train_data, test_data = RF_Model(df, sector, departure_date, forecast_period_start, forecast_period_end)
+
+            # Create tabs for the chart and the tables
+            tab1, tab2 = st.tabs(["Chart", "Table"])
+
+            with tab1:
+                # Create traces for the interactive plot
+                fig = go.Figure()
+
+                # Add training data (without predicted line)
+                fig.add_trace(go.Scatter(
+                    x=train_data["Sale Date"],
+                    y=train_data["Avg_YLD_USD"],
+                    mode="lines",
+                    name="Actual (Train)",
+                    line=dict(color="blue"),
+                ))
+
+                # Add testing data
+                fig.add_trace(go.Scatter(
+                    x=test_data["Sale Date"],
+                    y=test_data["Avg_YLD_USD"],
+                    mode="lines",
+                    name="Actual (Test)",
+                    line=dict(color="orange"),
+                ))
+
+                fig.add_trace(go.Scatter(
+                    x=test_data["Sale Date"],
+                    y=test_data["Predicted YLD USD"],
+                    mode="lines",
+                    name="Predicted (Test)",
+                    line=dict(color="red", dash="dot"),
+                ))
+
+                # Update layout
+                fig.update_layout(
+                    title="Actual vs Predicted YLD USD Over Time",
+                    xaxis_title="Sale Date",
+                    yaxis_title="YLD USD",
+                    legend_title="Legend",
+                    template="plotly_white",
+                    hovermode="x unified",
+                    width=1000,
+                    height=600
+                )
+
+                st.plotly_chart(fig)
+
+            with tab2:
+                st.subheader("Train Data: Actual vs Predicted")
+                st.dataframe(train_data[["Sale Date", "Avg_YLD_USD", "Predicted YLD USD"]])
+
+                st.subheader("Test Data: Actual vs Predicted")
+                st.dataframe(test_data[["Sale Date", "Avg_YLD_USD", "Predicted YLD USD"]])
