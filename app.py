@@ -5,6 +5,12 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import plotly.graph_objects as go
 
 def Xgboost_model(df, sector, departure_date, forecast_period_start, forecast_period_end):
+    # Convert 'Sale Date' to datetime if it's not already in datetime format
+    df["Sale Date"] = pd.to_datetime(df["Sale Date"])
+    
+    # Ensure forecast_period_end is a datetime object
+    forecast_period_end = pd.to_datetime(forecast_period_end)
+
     # Filter data for the selected sector
     df = df[df['Sector'] == sector]
 
@@ -15,7 +21,6 @@ def Xgboost_model(df, sector, departure_date, forecast_period_start, forecast_pe
     )
 
     # Calculate Days Before Departure
-    df["Sale Date"] = pd.to_datetime(df["Sale Date"])
     departure_date = pd.to_datetime(departure_date)
     df["Days Before Departure"] = (departure_date - df["Sale Date"]).dt.days
     df = df[df["Sale Date"] <= forecast_period_end]
@@ -123,6 +128,7 @@ def Xgboost_model(df, sector, departure_date, forecast_period_start, forecast_pe
     )
 
     st.plotly_chart(fig)
+
 
 # Streamlit user interface
 st.title("XGBoost Model for Forecasting YLD USD")
