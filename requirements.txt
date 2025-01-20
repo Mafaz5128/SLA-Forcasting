@@ -1,7 +1,6 @@
 streamlit
 pandas
-plotly
-statsmodels
+xgboost
 scikit-learn
-matplotlib
+plotly
 openpyxl
