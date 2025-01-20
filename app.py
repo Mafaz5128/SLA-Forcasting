@@ -84,21 +84,13 @@ def RF_Model(df, sector, departure_date, forecast_period_start, forecast_period_
     # Create traces for the interactive plot
     fig = go.Figure()
 
-    # Add training data
+    # Add training data (without predicted line)
     fig.add_trace(go.Scatter(
         x=train_data["Sale Date"],
         y=train_data["Avg_YLD_USD"],
         mode="lines",
         name="Actual (Train)",
         line=dict(color="blue"),
-    ))
-
-    fig.add_trace(go.Scatter(
-        x=train_data["Sale Date"],
-        y=train_data["Predicted YLD USD"],
-        mode="lines",
-        name="Predicted (Train)",
-        line=dict(color="green", dash="dot"),
     ))
 
     # Add testing data
@@ -204,21 +196,13 @@ def Xgboost_model(df, sector, departure_date, forecast_period_start, forecast_pe
     # Create traces for the interactive plot
     fig = go.Figure()
 
-    # Add training data
+    # Add training data (without predicted line)
     fig.add_trace(go.Scatter(
         x=train_data["Sale Date"],
         y=train_data["Avg_YLD_USD"],
         mode="lines",
         name="Actual (Train)",
         line=dict(color="blue"),
-    ))
-
-    fig.add_trace(go.Scatter(
-        x=train_data["Sale Date"],
-        y=train_data["Predicted YLD USD"],
-        mode="lines",
-        name="Predicted (Train)",
-        line=dict(color="green", dash="dot"),
     ))
 
     # Add testing data
