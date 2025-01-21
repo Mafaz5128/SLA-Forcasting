@@ -15,8 +15,9 @@ st.set_page_config(
 def combined_model(df, sector, departure_date, forecast_period_start, forecast_period_end):
     # Convert 'Sale Date' to datetime if it's not already in datetime format
     df["Sale Date"] = pd.to_datetime(df["Sale Date"])
+    
+    # Ensure forecast_period_end is a datetime object
     forecast_period_end = pd.to_datetime(forecast_period_end)
-    forecast_period_start = pd.to_datetime(forecast_period_start)
 
     # Filter data for the selected sector
     df = df[df['Sector'] == sector]
@@ -46,9 +47,10 @@ def combined_model(df, sector, departure_date, forecast_period_start, forecast_p
     df.dropna(inplace=True)
 
     # Define features and target
-    X = df[["Lag_1", "Lag_3", "MA_7", "EWMA_3", "EWMA_7", 
+    X = df[[ "Lag_1", "Lag_3", "MA_7", "EWMA_3", "EWMA_7", 
              "Sum_PAX", "Days Before Departure", "Cumulative PAX COUNT"]]
     y = df["Avg_YLD_USD"]
+    forecast_period_start = pd.to_datetime(forecast_period_start)
 
     # Split the dataset into training and testing sets
     train_data = df[df["Sale Date"] <= forecast_period_start]
@@ -60,29 +62,30 @@ def combined_model(df, sector, departure_date, forecast_period_start, forecast_p
     X_test = test_data[X.columns]
     y_test = test_data["Avg_YLD_USD"]
 
-    # Random Forest Model
+    # Initialize and train the RandomForest model
     rf_model = RandomForestRegressor(random_state=42, n_estimators=100, max_depth=10)
     rf_model.fit(X_train, y_train)
-    rf_train_pred = rf_model.predict(X_train)
-    rf_test_pred = rf_model.predict(X_test)
 
-    # XGBoost Model
+    # Predict with Random Forest
+    y_train_pred_rf = rf_model.predict(X_train)
+    y_test_pred_rf = rf_model.predict(X_test)
+
+    # Initialize and train the XGBoost model
     xgb_model = XGBRegressor(objective="reg:squarederror")
     xgb_model.fit(X_train, y_train)
-    xgb_train_pred = xgb_model.predict(X_train)
-    xgb_test_pred = xgb_model.predict(X_test)
 
-    # Add predictions to dataframes
-    train_data["RF_Predicted_YLD_USD"] = rf_train_pred
-    test_data["RF_Predicted_YLD_USD"] = rf_test_pred
+    # Predict with XGBoost
+    y_train_pred_xgb = xgb_model.predict(X_train)
+    y_test_pred_xgb = xgb_model.predict(X_test)
 
-    train_data["XGB_Predicted_YLD_USD"] = xgb_train_pred
-    test_data["XGB_Predicted_YLD_USD"] = xgb_test_pred
+    # Add predictions to test dataframe
+    test_data["Predicted YLD USD (RF)"] = y_test_pred_rf
+    test_data["Predicted YLD USD (XGB)"] = y_test_pred_xgb
 
     return train_data, test_data
 
 # Streamlit user interface
-st.title("Revenue Analysis: Combined XGBoost and Random Forest Models")
+st.title("Revenue Analysis: Combined Model")
 
 # File upload for CSV or Excel
 uploaded_file = st.file_uploader("Upload your dataset (CSV or Excel)", type=["csv", "xlsx"])
@@ -103,65 +106,67 @@ if uploaded_file is not None:
     forecast_period_start = st.sidebar.date_input("Forecast Period Start")
     forecast_period_end = st.sidebar.date_input("Forecast Period End")
 
-    if st.sidebar.button("Run Combined Models"):
+    # Run the combined model and display results
+    if st.sidebar.button("Run Combined Model"):
         train_data, test_data = combined_model(df, sector, departure_date, forecast_period_start, forecast_period_end)
 
-        # Create traces for the interactive plot
-        fig = go.Figure()
+        # Create tabs for the chart and the tables
+        tab1, tab2 = st.tabs(["Chart", "Table"])
 
-        # Add training data (Actual)
-        fig.add_trace(go.Scatter(
-            x=train_data["Sale Date"],
-            y=train_data["Avg_YLD_USD"],
-            mode="lines",
-            name="Actual (Train)",
-            line=dict(color="blue"),
-        ))
+        with tab1:
+            # Create traces for the interactive plot
+            fig = go.Figure()
 
-        # Add testing data (Actual)
-        fig.add_trace(go.Scatter(
-            x=test_data["Sale Date"],
-            y=test_data["Avg_YLD_USD"],
-            mode="lines",
-            name="Actual (Test)",
-            line=dict(color="orange"),
-        ))
+            # Add training data (Actual values)
+            fig.add_trace(go.Scatter(
+                x=train_data["Sale Date"],
+                y=train_data["Avg_YLD_USD"],
+                mode="lines",
+                name="Actual (Train)",
+                line=dict(color="blue"),
+            ))
 
-        # Add Random Forest Predictions (Test)
-        fig.add_trace(go.Scatter(
-            x=test_data["Sale Date"],
-            y=test_data["RF_Predicted_YLD_USD"],
-            mode="lines",
-            name="RF Predicted (Test)",
-            line=dict(color="green", dash="dot"),
-        ))
+            # Add testing data (Actual values)
+            fig.add_trace(go.Scatter(
+                x=test_data["Sale Date"],
+                y=test_data["Avg_YLD_USD"],
+                mode="lines",
+                name="Actual (Test)",
+                line=dict(color="orange"),
+            ))
 
-        # Add XGBoost Predictions (Test)
-        fig.add_trace(go.Scatter(
-            x=test_data["Sale Date"],
-            y=test_data["XGB_Predicted_YLD_USD"],
-            mode="lines",
-            name="XGB Predicted (Test)",
-            line=dict(color="red", dash="dash"),
-        ))
+            # Add predictions for Random Forest
+            fig.add_trace(go.Scatter(
+                x=test_data["Sale Date"],
+                y=test_data["Predicted YLD USD (RF)"],
+                mode="lines",
+                name="Predicted (RF)",
+                line=dict(color="green", dash="dot"),
+            ))
 
-        # Update layout
-        fig.update_layout(
-            title="Actual vs Predicted YLD USD Over Time",
-            xaxis_title="Sale Date",
-            yaxis_title="YLD USD",
-            legend_title="Legend",
-            template="plotly_white",
-            hovermode="x unified",
-            width=1000,
-            height=600
-        )
+            # Add predictions for XGBoost
+            fig.add_trace(go.Scatter(
+                x=test_data["Sale Date"],
+                y=test_data["Predicted YLD USD (XGB)"],
+                mode="lines",
+                name="Predicted (XGB)",
+                line=dict(color="red", dash="dot"),
+            ))
 
-        st.plotly_chart(fig)
+            # Update layout
+            fig.update_layout(
+                title="Actual vs Predicted YLD USD Over Time",
+                xaxis_title="Sale Date",
+                yaxis_title="YLD USD",
+                legend_title="Legend",
+                template="plotly_white",
+                hovermode="x unified",
+                width=1000,
+                height=600
+            )
 
-        # Display data tables
-        st.subheader("Train Data: Actual vs Predicted")
-        st.dataframe(train_data[["Sale Date", "Avg_YLD_USD", "RF_Predicted_YLD_USD", "XGB_Predicted_YLD_USD"]])
+            st.plotly_chart(fig)
 
-        st.subheader("Test Data: Actual vs Predicted")
-        st.dataframe(test_data[["Sale Date", "Avg_YLD_USD", "RF_Predicted_YLD_USD", "XGB_Predicted_YLD_USD"]])
+        with tab2:
+            st.subheader("Test Data: Actual vs Predicted")
+            st.dataframe(test_data[["Sale Date", "Avg_YLD_USD", "Predicted YLD USD (RF)", "Predicted YLD USD (XGB)"]])
