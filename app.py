@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 
 # Streamlit page configuration
 st.set_page_config(
-    page_title="Station Revenue Analysis Dashboard",
+    page_title="Average YLD Forecasting Dashboard",
     page_icon=":chart_with_upwards_trend:",
     layout="wide"
 )
@@ -85,7 +85,7 @@ def combined_model(df, sector, departure_date, forecast_period_start, forecast_p
     return train_data, test_data
 
 # Streamlit user interface
-st.title("Revenue Analysis: Combined Model")
+st.title("Average YLD Prediction")
 
 # Directly load the dataset
 file_path = "Daily Yield_Nov24_12M&6M.xlsx"
@@ -94,11 +94,11 @@ df = pd.read_excel(file_path)
 # Fixed input values
 sector = st.sidebar.selectbox("Select Sector", df['Sector'].unique())
 departure_date = "2024-11-01"
-forecast_period_start = st.sidebar.date_input("Forecast Period Start")
-forecast_period_end = st.sidebar.date_input("Forecast Period End")
+forecast_period_start = st.sidebar.date_input("Forecast Period: Start")
+forecast_period_end = st.sidebar.date_input("Forecast Period: End")
 
 # Run the combined model and display results
-if st.sidebar.button("Run Combined Model"):
+if st.sidebar.button("Forcast"):
     train_data, test_data = combined_model(df, sector, departure_date, forecast_period_start, forecast_period_end)
 
     # Create tabs for the chart and the tables
