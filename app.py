@@ -98,7 +98,7 @@ departure_date = st.sidebar.date_input("Departure Date")
 
 # Run the combined model and display results
 if st.sidebar.button("Forecast"):
-    train_data, test_data, filtered_df = combined_model(
+    train_data, test_data = combined_model(
         df, sector, departure_date, forecast_period_start, forecast_period_end
     )
 
@@ -166,7 +166,7 @@ if st.sidebar.button("Forecast"):
     # Filter for PAX graph dynamically
     # Plot the cumulative sum time series graph for PAX
     fig2 = px.line(
-        train,
+        train_data,
         x="Sale Date"
         y="Cumulative PAX COUNT",
         title=f"Cumulative PAX COUNT Before {forecast_period_start} for Sector: {sector}",
