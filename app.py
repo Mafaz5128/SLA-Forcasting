@@ -167,7 +167,7 @@ if st.sidebar.button("Forecast"):
     # Plot the cumulative sum time series graph for PAX
     fig2 = px.line(
         train_data,
-        x="Sale Date"
+        x="Sale Date",
         y="Cumulative PAX COUNT",
         title=f"Cumulative PAX COUNT Before {forecast_period_start} for Sector: {sector}",
         labels={"Sale Date": "Sale Date", "Cumulative PAX COUNT": "Cumulative PAX COUNT"},
