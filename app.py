@@ -88,7 +88,7 @@ st.title("Average YLD Prediction")
 
 # Load the dataset
 file_path = "Daily Yield_Nov24_12M&6M.xlsx"
-df = pd.read_excel(file_path,sheet ='6M')
+df = pd.read_excel(file_path, sheet ='6M')
 
 # Sidebar for user inputs
 sector = st.sidebar.selectbox("Select Sector", df['Sector'].unique())
@@ -98,7 +98,7 @@ departure_date = st.sidebar.date_input("Departure Date")
 
 # Run the combined model and display results
 if st.sidebar.button("Forecast"):
-    train_data, test_data = combined_model(
+    train_data, test_data, df = combined_model(
         df, sector, departure_date, forecast_period_start, forecast_period_end
     )
 
@@ -164,33 +164,33 @@ if st.sidebar.button("Forecast"):
         st.dataframe(test_data[["Sale Date", "Avg_YLD_USD", "Predicted YLD USD (RF)", "Predicted YLD USD (XGB)"]])
 
     # Filter for PAX graph dynamically
-    # Plot the cumulative sum time series graph for PAX
-df["Sale Date"] = pd.to_datetime(df["Sale Date"])
-forecast_period_end = pd.to_datetime(forecast_period_end)
-df = df[df['Sector'] == sector]
-df = df.groupby("Sale Date", as_index=False).agg(
-    Avg_YLD_USD=("YLD USD", "mean"),
-    Sum_PAX=("PAX COUNT", "sum")
-)
-departure_date = pd.to_datetime(departure_date)
-df["Days Before Departure"] = (departure_date - df["Sale Date"]).dt.days
-df = df[df["Sale Date"] <= forecast_period_end]
-df["Cumulative PAX COUNT"] = df["Sum_PAX"].cumsum()
-fig2 = px.line(
-    df,
-    x="Sale Date",
-    y="Cumulative PAX COUNT",
-    title=f"Cumulative PAX COUNT Before {forecast_period_start} for Sector: {sector}",
-    labels={"Sale Date": "Sale Date", "Cumulative PAX COUNT": "Cumulative PAX COUNT"},
-    markers=True
-)
+    df["Sale Date"] = pd.to_datetime(df["Sale Date"])
+    forecast_period_end = pd.to_datetime(forecast_period_end)
+    df = df[df['Sector'] == sector]
+    df = df.groupby("Sale Date", as_index=False).agg(
+        Avg_YLD_USD=("YLD USD", "mean"),
+        Sum_PAX=("PAX COUNT", "sum")
+    )
+    departure_date = pd.to_datetime(departure_date)
+    df["Days Before Departure"] = (departure_date - df["Sale Date"]).dt.days
+    df = df[df["Sale Date"] <= forecast_period_end]
+    df["Cumulative PAX COUNT"] = df["Sum_PAX"].cumsum()
+
+    fig2 = px.line(
+        df,
+        x="Sale Date",
+        y="Cumulative PAX COUNT",
+        title=f"Cumulative PAX COUNT Before {forecast_period_start} for Sector: {sector}",
+        labels={"Sale Date": "Sale Date", "Cumulative PAX COUNT": "Cumulative PAX COUNT"},
+        markers=True
+    )
 
     # Update layout for better visuals
-fig2.update_layout(
-    xaxis_title="Sale Date",
-    yaxis_title="Cumulative PAX COUNT",
-    template="plotly_dark",
-    hovermode="x unified"
-)
+    fig2.update_layout(
+        xaxis_title="Sale Date",
+        yaxis_title="Cumulative PAX COUNT",
+        template="plotly_dark",
+        hovermode="x unified"
+    )
 
-st.plotly_chart(fig2)
+    st.plotly_chart(fig2)
