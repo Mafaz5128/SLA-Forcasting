@@ -88,7 +88,7 @@ st.title("Average YLD Prediction")
 
 # Load the dataset
 file_path = "Daily Yield_Nov24_12M&6M.xlsx"
-df = pd.read_excel(file_path, sheet ='6M')
+df = pd.read_excel(file_path, sheet_name ='6M')
 
 # Sidebar for user inputs
 sector = st.sidebar.selectbox("Select Sector", df['Sector'].unique())
