@@ -166,7 +166,21 @@ if st.sidebar.button("Forecast"):
 
     # Additional column layout for cumulative PAX COUNT plot
     a1, a2 = st.columns(2)
+    df = df[df['Sector'] == sector]
 
+    # Group by 'Sale Date' and calculate average YLD USD and sum of PAX COUNT
+    df = df.groupby("Sale Date", as_index=False).agg(
+        Avg_YLD_USD=("YLD USD", "mean"),
+        Sum_PAX=("PAX COUNT", "sum")
+    )
+
+    # Calculate Days Before Departure
+    departure_date = pd.to_datetime(departure_date)
+    df["Days Before Departure"] = (departure_date - df["Sale Date"]).dt.days
+    df = df[df["Sale Date"] <= forecast_period_end]
+
+    # Cumulative PAX COUNT
+    df["Cumulative PAX COUNT"] = df["Sum_PAX"].cumsum()
     # Calculate the cumulative sum of PAX COUNT
     df["Sale Date"] = pd.to_datetime(df["Sale Date"])
     df["Cumulative PAX COUNT"] = df.groupby("Sector")["PAX COUNT"].cumsum()
