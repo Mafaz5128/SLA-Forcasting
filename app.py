@@ -166,7 +166,7 @@ if st.sidebar.button("Forecast"):
     # Filter for PAX graph dynamically
     df["Sale Date"] = pd.to_datetime(df["Sale Date"])
     forecast_period_end = pd.to_datetime(forecast_period_end)
-    df = df[df['Sector'] == sector]
+    df = df['Sector'] == sector]
     df = df.groupby("Sale Date", as_index=False).agg(
         Avg_YLD_USD=("YLD USD", "mean"),
         Sum_PAX=("PAX COUNT", "sum")
