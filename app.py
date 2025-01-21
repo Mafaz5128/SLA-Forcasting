@@ -81,7 +81,7 @@ def combined_model(df, sector, departure_date, forecast_period_start, forecast_p
     test_data["Predicted YLD USD (RF)"] = y_test_pred_rf
     test_data["Predicted YLD USD (XGB)"] = y_test_pred_xgb
 
-    return train_data, test_data
+    return train_data, test_data, df
 
 # Streamlit user interface
 st.title("Average YLD Prediction")
@@ -92,13 +92,15 @@ df = pd.read_excel(file_path)
 
 # Sidebar for user inputs
 sector = st.sidebar.selectbox("Select Sector", df['Sector'].unique())
-departure_date = "2024-11-01"
 forecast_period_start = st.sidebar.date_input("Forecast Period: Start")
 forecast_period_end = st.sidebar.date_input("Forecast Period: End")
+departure_date = st.sidebar.date_input("Departure Date")
 
 # Run the combined model and display results
 if st.sidebar.button("Forecast"):
-    train_data, test_data = combined_model(df, sector, departure_date, forecast_period_start, forecast_period_end)
+    train_data, test_data, filtered_df = combined_model(
+        df, sector, departure_date, forecast_period_start, forecast_period_end
+    )
 
     # Create tabs for the chart and the tables
     tab1, tab2 = st.tabs(["Chart", "Table"])
@@ -161,23 +163,13 @@ if st.sidebar.button("Forecast"):
         st.subheader("Test Data: Actual vs Predicted")
         st.dataframe(test_data[["Sale Date", "Avg_YLD_USD", "Predicted YLD USD (RF)", "Predicted YLD USD (XGB)"]])
 
-    # Additional layout for the PAX graph
-    sector_filtered_df = df[df['Sector'] == sector]
-
-    # Group by 'Sale Date' and calculate the cumulative sum of PAX COUNT
-    sector_filtered_df = sector_filtered_df.groupby("Sale Date", as_index=False).agg(
-        Sum_PAX=("PAX COUNT", "sum")
-    )
-
-    # Calculate cumulative PAX COUNT
-    sector_filtered_df["Cumulative PAX COUNT"] = sector_filtered_df["Sum_PAX"].cumsum()
-
-    # Filter data based on the forecast period start (include only dates before)
-    sector_filtered_df = sector_filtered_df[
-        sector_filtered_df["Sale Date"] < pd.to_datetime(forecast_period_start)
+    # Filter for PAX graph dynamically
+    sector_filtered_df = filtered_df[
+        (filtered_df["Sector"] == sector) &
+        (filtered_df["Sale Date"] < pd.to_datetime(forecast_period_start))
     ]
 
-    # Plot the cumulative sum time series graph
+    # Plot the cumulative sum time series graph for PAX
     fig2 = px.line(
         sector_filtered_df,
         x="Sale Date",
