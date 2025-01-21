@@ -4,6 +4,7 @@ from xgboost import XGBRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import plotly.graph_objects as go
+import plotly.express as px
 
 # Streamlit page configuration
 st.set_page_config(
@@ -13,9 +14,9 @@ st.set_page_config(
 )
 
 def combined_model(df, sector, departure_date, forecast_period_start, forecast_period_end):
-    # Convert 'Sale Date' to datetime if it's not already in datetime format
+    # Convert 'Sale Date' to datetime
     df["Sale Date"] = pd.to_datetime(df["Sale Date"])
-    
+
     # Ensure forecast_period_end is a datetime object
     forecast_period_end = pd.to_datetime(forecast_period_end)
 
@@ -47,9 +48,10 @@ def combined_model(df, sector, departure_date, forecast_period_start, forecast_p
     df.dropna(inplace=True)
 
     # Define features and target
-    X = df[[ "Lag_1", "Lag_3", "MA_7", "EWMA_3", "EWMA_7", 
+    X = df[["Lag_1", "Lag_3", "MA_7", "EWMA_3", "EWMA_7", 
              "Sum_PAX", "Days Before Departure", "Cumulative PAX COUNT"]]
     y = df["Avg_YLD_USD"]
+
     forecast_period_start = pd.to_datetime(forecast_period_start)
 
     # Split the dataset into training and testing sets
@@ -98,7 +100,7 @@ forecast_period_start = st.sidebar.date_input("Forecast Period: Start")
 forecast_period_end = st.sidebar.date_input("Forecast Period: End")
 
 # Run the combined model and display results
-if st.sidebar.button("Forcast"):
+if st.sidebar.button("Forecast"):
     train_data, test_data = combined_model(df, sector, departure_date, forecast_period_start, forecast_period_end)
 
     # Create tabs for the chart and the tables
@@ -161,29 +163,31 @@ if st.sidebar.button("Forcast"):
     with tab2:
         st.subheader("Test Data: Actual vs Predicted")
         st.dataframe(test_data[["Sale Date", "Avg_YLD_USD", "Predicted YLD USD (RF)", "Predicted YLD USD (XGB)"]])
+
+    # Additional column layout for cumulative PAX COUNT plot
     a1, a2 = st.columns(2)
+
+    # Calculate the cumulative sum of PAX COUNT
     df["Sale Date"] = pd.to_datetime(df["Sale Date"])
+    df["Cumulative PAX COUNT"] = df.groupby("Sector")["PAX COUNT"].cumsum()
 
-# Calculate the cumulative sum of PAX COUNT
-    df["Cumulative PAX COUNT"] = df["PAX COUNT"].cumsum()
-
-# Plot the cumulative sum time series graph
+    # Plot the cumulative sum time series graph
     fig2 = px.line(
         df,
         x="Sale Date",
         y="Cumulative PAX COUNT",
         title="Cumulative Sum of PAX COUNT Over Time",
         labels={"Sale Date": "Sale Date", "Cumulative PAX COUNT": "Cumulative PAX COUNT"},
-        markers=True  # Add markers to the line
+        markers=True
     )
 
-# Update layout for better visuals
+    # Update layout for better visuals
     fig2.update_layout(
         xaxis_title="Sale Date",
         yaxis_title="Cumulative PAX COUNT",
-        template="plotly_dark",  # Use a dark theme
-        hovermode="x unified"  # Unified hover for better interactivity
+        template="plotly_dark",
+        hovermode="x unified"
     )
 
-# Show the chart
+    # Show the chart in the left column
     a1.plotly_chart(fig2)
