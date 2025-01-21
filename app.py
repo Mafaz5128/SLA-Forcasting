@@ -161,3 +161,29 @@ if st.sidebar.button("Forcast"):
     with tab2:
         st.subheader("Test Data: Actual vs Predicted")
         st.dataframe(test_data[["Sale Date", "Avg_YLD_USD", "Predicted YLD USD (RF)", "Predicted YLD USD (XGB)"]])
+    a1, a2 = st.columns(2)
+    df["Sale Date"] = pd.to_datetime(df["Sale Date"])
+
+# Calculate the cumulative sum of PAX COUNT
+    df["Cumulative PAX COUNT"] = df["PAX COUNT"].cumsum()
+
+# Plot the cumulative sum time series graph
+    fig2 = px.line(
+        df,
+        x="Sale Date",
+        y="Cumulative PAX COUNT",
+        title="Cumulative Sum of PAX COUNT Over Time",
+        labels={"Sale Date": "Sale Date", "Cumulative PAX COUNT": "Cumulative PAX COUNT"},
+        markers=True  # Add markers to the line
+    )
+
+# Update layout for better visuals
+    fig2.update_layout(
+        xaxis_title="Sale Date",
+        yaxis_title="Cumulative PAX COUNT",
+        template="plotly_dark",  # Use a dark theme
+        hovermode="x unified"  # Unified hover for better interactivity
+    )
+
+# Show the chart
+    a1.plotly_chart(fig2)
