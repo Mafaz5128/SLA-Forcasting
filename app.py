@@ -165,21 +165,32 @@ if st.sidebar.button("Forecast"):
 
     # Filter for PAX graph dynamically
     # Plot the cumulative sum time series graph for PAX
-    fig2 = px.line(
-        train_data,
-        x="Sale Date",
-        y="Cumulative PAX COUNT",
-        title=f"Cumulative PAX COUNT Before {forecast_period_start} for Sector: {sector}",
-        labels={"Sale Date": "Sale Date", "Cumulative PAX COUNT": "Cumulative PAX COUNT"},
-        markers=True
-    )
+df["Sale Date"] = pd.to_datetime(df["Sale Date"])
+forecast_period_end = pd.to_datetime(forecast_period_end)
+df = df[df['Sector'] == sector]
+df = df.groupby("Sale Date", as_index=False).agg(
+    Avg_YLD_USD=("YLD USD", "mean"),
+    Sum_PAX=("PAX COUNT", "sum")
+)
+departure_date = pd.to_datetime(departure_date)
+df["Days Before Departure"] = (departure_date - df["Sale Date"]).dt.days
+df = df[df["Sale Date"] <= forecast_period_end]
+df["Cumulative PAX COUNT"] = df["Sum_PAX"].cumsum()
+fig2 = px.line(
+    df,
+    x="Sale Date",
+    y="Cumulative PAX COUNT",
+    title=f"Cumulative PAX COUNT Before {forecast_period_start} for Sector: {sector}",
+    labels={"Sale Date": "Sale Date", "Cumulative PAX COUNT": "Cumulative PAX COUNT"},
+    markers=True
+)
 
     # Update layout for better visuals
-    fig2.update_layout(
-        xaxis_title="Sale Date",
-        yaxis_title="Cumulative PAX COUNT",
-        template="plotly_dark",
-        hovermode="x unified"
-    )
+fig2.update_layout(
+    xaxis_title="Sale Date",
+    yaxis_title="Cumulative PAX COUNT",
+    template="plotly_dark",
+    hovermode="x unified"
+)
 
-    st.plotly_chart(fig2)
+st.plotly_chart(fig2)
