@@ -87,86 +87,77 @@ def combined_model(df, sector, departure_date, forecast_period_start, forecast_p
 # Streamlit user interface
 st.title("Revenue Analysis: Combined Model")
 
-# File upload for CSV or Excel
-uploaded_file = st.file_uploader("Upload your dataset (CSV or Excel)", type=["csv", "xlsx"])
+# Directly load the dataset
+file_path = "Daily Yield_Nov24_12M&6M.xlsx"
+df = pd.read_excel(file_path)
 
-if uploaded_file is not None:
-    if uploaded_file.name.endswith('.csv'):
-        df = pd.read_csv(uploaded_file)
-    else:
-        # If the file is Excel, load it and let the user select a sheet
-        xls = pd.ExcelFile(uploaded_file)
-        sheet_names = xls.sheet_names
-        sheet_name = st.selectbox("Select Sheet", sheet_names)
-        df = pd.read_excel(xls, sheet_name=sheet_name)
+# Fixed input values
+sector = st.sidebar.selectbox("Select Sector", df['Sector'].unique())
+departure_date = "2024-11-01"
+forecast_period_start = st.sidebar.date_input("Forecast Period Start")
+forecast_period_end = st.sidebar.date_input("Forecast Period End")
 
-    # Inputs
-    sector = st.sidebar.selectbox("Select Sector", df['Sector'].unique())
-    departure_date = st.sidebar.date_input("Departure Date")
-    forecast_period_start = st.sidebar.date_input("Forecast Period Start")
-    forecast_period_end = st.sidebar.date_input("Forecast Period End")
+# Run the combined model and display results
+if st.sidebar.button("Run Combined Model"):
+    train_data, test_data = combined_model(df, sector, departure_date, forecast_period_start, forecast_period_end)
 
-    # Run the combined model and display results
-    if st.sidebar.button("Run Combined Model"):
-        train_data, test_data = combined_model(df, sector, departure_date, forecast_period_start, forecast_period_end)
+    # Create tabs for the chart and the tables
+    tab1, tab2 = st.tabs(["Chart", "Table"])
 
-        # Create tabs for the chart and the tables
-        tab1, tab2 = st.tabs(["Chart", "Table"])
+    with tab1:
+        # Create traces for the interactive plot
+        fig = go.Figure()
 
-        with tab1:
-            # Create traces for the interactive plot
-            fig = go.Figure()
+        # Add training data (Actual values)
+        fig.add_trace(go.Scatter(
+            x=train_data["Sale Date"],
+            y=train_data["Avg_YLD_USD"],
+            mode="lines",
+            name="Actual (Train)",
+            line=dict(color="blue"),
+        ))
 
-            # Add training data (Actual values)
-            fig.add_trace(go.Scatter(
-                x=train_data["Sale Date"],
-                y=train_data["Avg_YLD_USD"],
-                mode="lines",
-                name="Actual (Train)",
-                line=dict(color="blue"),
-            ))
+        # Add testing data (Actual values)
+        fig.add_trace(go.Scatter(
+            x=test_data["Sale Date"],
+            y=test_data["Avg_YLD_USD"],
+            mode="lines",
+            name="Actual (Test)",
+            line=dict(color="orange"),
+        ))
 
-            # Add testing data (Actual values)
-            fig.add_trace(go.Scatter(
-                x=test_data["Sale Date"],
-                y=test_data["Avg_YLD_USD"],
-                mode="lines",
-                name="Actual (Test)",
-                line=dict(color="orange"),
-            ))
+        # Add predictions for Random Forest
+        fig.add_trace(go.Scatter(
+            x=test_data["Sale Date"],
+            y=test_data["Predicted YLD USD (RF)"],
+            mode="lines",
+            name="Predicted (RF)",
+            line=dict(color="green", dash="dot"),
+        ))
 
-            # Add predictions for Random Forest
-            fig.add_trace(go.Scatter(
-                x=test_data["Sale Date"],
-                y=test_data["Predicted YLD USD (RF)"],
-                mode="lines",
-                name="Predicted (RF)",
-                line=dict(color="green", dash="dot"),
-            ))
+        # Add predictions for XGBoost
+        fig.add_trace(go.Scatter(
+            x=test_data["Sale Date"],
+            y=test_data["Predicted YLD USD (XGB)"],
+            mode="lines",
+            name="Predicted (XGB)",
+            line=dict(color="red", dash="dot"),
+        ))
 
-            # Add predictions for XGBoost
-            fig.add_trace(go.Scatter(
-                x=test_data["Sale Date"],
-                y=test_data["Predicted YLD USD (XGB)"],
-                mode="lines",
-                name="Predicted (XGB)",
-                line=dict(color="red", dash="dot"),
-            ))
+        # Update layout
+        fig.update_layout(
+            title="Actual vs Predicted YLD USD Over Time",
+            xaxis_title="Sale Date",
+            yaxis_title="YLD USD",
+            legend_title="Legend",
+            template="plotly_white",
+            hovermode="x unified",
+            width=1000,
+            height=600
+        )
 
-            # Update layout
-            fig.update_layout(
-                title="Actual vs Predicted YLD USD Over Time",
-                xaxis_title="Sale Date",
-                yaxis_title="YLD USD",
-                legend_title="Legend",
-                template="plotly_white",
-                hovermode="x unified",
-                width=1000,
-                height=600
-            )
+        st.plotly_chart(fig)
 
-            st.plotly_chart(fig)
-
-        with tab2:
-            st.subheader("Test Data: Actual vs Predicted")
-            st.dataframe(test_data[["Sale Date", "Avg_YLD_USD", "Predicted YLD USD (RF)", "Predicted YLD USD (XGB)"]])
+    with tab2:
+        st.subheader("Test Data: Actual vs Predicted")
+        st.dataframe(test_data[["Sale Date", "Avg_YLD_USD", "Predicted YLD USD (RF)", "Predicted YLD USD (XGB)"]])
