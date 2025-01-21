@@ -164,15 +164,10 @@ if st.sidebar.button("Forecast"):
         st.dataframe(test_data[["Sale Date", "Avg_YLD_USD", "Predicted YLD USD (RF)", "Predicted YLD USD (XGB)"]])
 
     # Filter for PAX graph dynamically
-    sector_filtered_df = filtered_df[
-        (filtered_df["Sector"] == sector) &
-        (filtered_df["Sale Date"] < pd.to_datetime(forecast_period_start))
-    ]
-
     # Plot the cumulative sum time series graph for PAX
     fig2 = px.line(
-        sector_filtered_df,
-        x="Sale Date",
+        train,
+        x="Sale Date"
         y="Cumulative PAX COUNT",
         title=f"Cumulative PAX COUNT Before {forecast_period_start} for Sector: {sector}",
         labels={"Sale Date": "Sale Date", "Cumulative PAX COUNT": "Cumulative PAX COUNT"},
