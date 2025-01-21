@@ -178,8 +178,8 @@ if st.sidebar.button("Forecast"):
 
     fig2 = px.line(
         df,
-        x="Sale Date",
-        y="Cumulative PAX COUNT",
+        x=df["Sale Date"],
+        y=df["Cumulative PAX COUNT"],
         title=f"Cumulative PAX COUNT Before {forecast_period_start} for Sector: {sector}",
         labels={"Sale Date": "Sale Date", "Cumulative PAX COUNT": "Cumulative PAX COUNT"},
         markers=True
