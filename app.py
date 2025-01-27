@@ -39,7 +39,7 @@ if uploaded_file:
     # Ensure sale data is before the forecast start period
     departure_date = pd.to_datetime(flight_date)
     filtered_data['Sale Date'] = pd.to_datetime(filtered_data['Sale Date'])
-    filtered_data = filtered_data[filtered_data['Sale Date'] <= (departure_date - pd.Timedelta(days=forecast_start))]
+    filtered_data = filtered_data[filtered_data['Sale Date'] <= (departure_date - pd.Timedelta(days=forecast_end))]
 
     # Group data
     grouped_data = filtered_data.groupby("Sale Date", as_index=False).agg(
