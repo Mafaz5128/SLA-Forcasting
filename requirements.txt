@@ -5,4 +5,3 @@ matplotlib
 statsmodels
 scikit-learn
 datetime
-itertools
