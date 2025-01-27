@@ -3,6 +3,6 @@ pandas
 numpy
 matplotlib
 statsmodels
-sklearn
+scikit-learn
 datetime
 itertools
