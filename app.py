@@ -30,25 +30,29 @@ if uploaded_file:
                                 max_value=pd.to_datetime(filtered_data['Flight Date']).max())
     filtered_data = filtered_data[filtered_data['Flight Date'] == str(flight_date)]
 
-    # Select forecast period start and end points
-    forecast_start = st.slider("Select Forecast Start Point (Days Before Departure):", 
-                                min_value=1, max_value=90, value=10)
-    forecast_end = st.slider("Select Forecast End Point (Days Before Departure):", 
-                              min_value=forecast_start + 1, max_value=120, value=30)
+    # Select forecast period based on sale dates
+    min_sale_date = pd.to_datetime(filtered_data['Sale Date']).min()
+    max_sale_date = pd.to_datetime(filtered_data['Sale Date']).max()
 
-    # Ensure sale data is before the forecast start period
-    departure_date = pd.to_datetime(flight_date)
+    forecast_start = st.date_input("Select Forecast Start Date:", 
+                                   min_value=min_sale_date, 
+                                   max_value=max_sale_date, 
+                                   value=min_sale_date)
+    forecast_end = st.date_input("Select Forecast End Date:", 
+                                 min_value=forecast_start, 
+                                 max_value=max_sale_date, 
+                                 value=max_sale_date)
+
+    # Filter data based on forecast period
     filtered_data['Sale Date'] = pd.to_datetime(filtered_data['Sale Date'])
-    filtered_data = filtered_data[filtered_data['Sale Date'] <= (departure_date - pd.Timedelta(days=forecast_end))]
+    forecast_data = filtered_data[(filtered_data['Sale Date'] >= forecast_start) & 
+                                  (filtered_data['Sale Date'] <= forecast_end)]
 
     # Group data
-    grouped_data = filtered_data.groupby("Sale Date", as_index=False).agg(
+    grouped_data = forecast_data.groupby("Sale Date", as_index=False).agg(
         Avg_YLD_USD=("YLD USD", "mean"),
         Sum_PAX=("PAX COUNT", "sum")
     )
-
-    grouped_data["Sale Date"] = pd.to_datetime(grouped_data["Sale Date"])
-    grouped_data["Days Before Departure"] = (departure_date - grouped_data["Sale Date"]).dt.days
 
     st.write("### Processed Data:")
     st.dataframe(grouped_data)
@@ -58,24 +62,22 @@ if uploaded_file:
     fitted_model = model.fit()
 
     # Forecast period
-    forecast_period = forecast_end - forecast_start
+    forecast_period = (pd.to_datetime(forecast_end) - pd.to_datetime(forecast_start)).days
     forecast = fitted_model.forecast(steps=forecast_period)
-    forecast_reversed = forecast[::-1]
 
     # Plot
     st.write("### Yield Forecasting")
     fig, ax = plt.subplots(figsize=(10, 6))
     
     # Training data
-    ax.plot(grouped_data['Days Before Departure'], grouped_data['Avg_YLD_USD'], marker='o', linestyle='-', label='Training Data')
+    ax.plot(grouped_data['Sale Date'], grouped_data['Avg_YLD_USD'], marker='o', linestyle='-', label='Training Data')
     
     # Forecast
-    forecast_index = np.arange(forecast_start, forecast_start - forecast_period, -1)
-    ax.plot(forecast_index, forecast_reversed, marker='o', linestyle='-', color='red', label='Forecast')
+    forecast_dates = pd.date_range(start=forecast_start, periods=forecast_period, freq='D')
+    ax.plot(forecast_dates, forecast, marker='o', linestyle='-', color='red', label='Forecast')
 
-    ax.set_xlabel('Days Before Departure')
+    ax.set_xlabel('Sale Date')
     ax.set_ylabel('YLD USD')
-    ax.invert_xaxis()  # Reverse the X-axis
     ax.legend()
     ax.set_title('Training Data and Forecast')
     st.pyplot(fig)
@@ -83,7 +85,8 @@ if uploaded_file:
     # Comparison table
     st.write("### Forecast vs Actual Data")
     forecasted_vs_actual = pd.DataFrame({
-        'Forecasted': forecast_reversed[:len(grouped_data)],
-        'Actual': grouped_data['Avg_YLD_USD'].values[:len(forecast_reversed)]
+        'Sale Date': forecast_dates[:len(grouped_data)],
+        'Forecasted': forecast[:len(grouped_data)],
+        'Actual': grouped_data['Avg_YLD_USD'].values[:len(forecast)]
     })
     st.dataframe(forecasted_vs_actual)
