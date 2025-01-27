@@ -8,7 +8,7 @@ from itertools import product
 
 # Streamlit page configuration
 st.set_page_config(
-    page_title="Forecasting Dashboard",
+    page_title="Average Yield Forecasting",
     page_icon=":chart_with_upwards_trend:",
     layout="wide"
 )
