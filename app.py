@@ -1,92 +1,197 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
+import plotly.graph_objects as go
+from datetime import timedelta
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
-import matplotlib.pyplot as plt
+from sklearn.metrics import mean_absolute_error
+from itertools import product
 
-# Streamlit app
-st.title('Yield Forecasting with Exponential Smoothing')
+# Streamlit page configuration
+st.set_page_config(
+    page_title="Forecasting Dashboard",
+    page_icon=":chart_with_upwards_trend:",
+    layout="wide"
+)
+st.header("Average Yield Prediction")
 
-# File uploader
-uploaded_file = st.file_uploader("Upload your dataset (CSV or Excel):", type=["csv", "xlsx"])
+# File upload section
+uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
 if uploaded_file:
-    # Read the uploaded file
-    if uploaded_file.name.endswith('.csv'):
-        df = pd.read_csv(uploaded_file)
-    else:
-        df = pd.read_excel(uploaded_file)
+    # Load the uploaded file into a DataFrame
+    df = pd.read_excel(uploaded_file)
 
-    st.write("### Uploaded Dataset:")
-    st.dataframe(df.head())
+    # Convert 'Sale Date' and 'Flight Date' to datetime
+    df["Sale Date"] = pd.to_datetime(df["Sale Date"])
+    df["Flight Date"] = pd.to_datetime(df["Flight Date"])
 
-    # Filter by sector
-    sector = st.selectbox("Select a Sector:", df['Sector'].unique())
-    filtered_data = df[df['Sector'] == sector]
+    # Get unique sectors and flight dates for user selection
+    sectors = df['Sector'].unique()
+    selected_sector = st.selectbox('Select Sector', sectors)
 
-    # Filter by flight date
-    flight_date = st.date_input("Select a Flight Date:", 
-                                min_value=pd.to_datetime(filtered_data['Flight Date']).min(), 
-                                max_value=pd.to_datetime(filtered_data['Flight Date']).max())
-    filtered_data = filtered_data[filtered_data['Flight Date'] == str(flight_date)]
+    flight_dates = df['Flight Date'].unique()
+    departure_date = st.selectbox('Select Departure Date', flight_dates)
+    departure_date = pd.to_datetime(departure_date)
 
-    # Select forecast period based on sale dates
-    min_sale_date = pd.to_datetime(filtered_data['Sale Date']).min()
-    max_sale_date = pd.to_datetime(filtered_data['Sale Date']).max()
+    # Calculate the forecast period window (10 days before departure date)
+    forecast_window_start = departure_date - pd.Timedelta(days=90)
+    forecast_window_end = departure_date
 
-    forecast_start = st.date_input("Select Forecast Start Date:", 
-                                   min_value=min_sale_date, 
-                                   max_value=max_sale_date, 
-                                   value=min_sale_date)
-    forecast_end = st.date_input("Select Forecast End Date:", 
-                                 min_value=forecast_start, 
-                                 max_value=max_sale_date, 
-                                 value=max_sale_date)
+# Display the valid range for the forecast start and end dates
+    #st.write(f"Forecast period must be between {forecast_window_start.date()} and {forecast_window_end.date()}.")
 
-    # Filter data based on forecast period
-    filtered_data['Sale Date'] = pd.to_datetime(filtered_data['Sale Date'])
-    forecast_data = filtered_data[(filtered_data['Sale Date'] >= forecast_start) & 
-                                  (filtered_data['Sale Date'] <= forecast_end)]
-
-    # Group data
-    grouped_data = forecast_data.groupby("Sale Date", as_index=False).agg(
-        Avg_YLD_USD=("YLD USD", "mean"),
-        Sum_PAX=("PAX COUNT", "sum")
+# Section 2: Select the forecast start date
+    forecast_period_start = st.date_input(
+        "Select Forecast Start Date",
+        min_value=forecast_window_start,
+        max_value=forecast_window_end
     )
 
-    st.write("### Processed Data:")
-    st.dataframe(grouped_data)
+# Section 3: Select the forecast end date
+    forecast_period_end = st.date_input(
+        "Select Forecast End Date",
+        min_value=forecast_period_start,  # Ensure the end date is after or equal to the start date
+        max_value=forecast_window_end     # Ensure the end date is before or equal to the departure date
+    )
 
-    # Exponential Smoothing
-    model = ExponentialSmoothing(grouped_data['Avg_YLD_USD'], trend='add', seasonal='add', seasonal_periods=7)
-    fitted_model = model.fit()
+# Validate the selected range and display it
+    if forecast_period_start and forecast_period_end:
+        st.write(f"Selected Forecast Period: {forecast_period_start} to {forecast_period_end}")
 
-    # Forecast period
-    forecast_period = (pd.to_datetime(forecast_end) - pd.to_datetime(forecast_start)).days
-    forecast = fitted_model.forecast(steps=forecast_period)
+    # Add a button to generate the plots
+    if st.button("Generate Forecast Plots"):
+        # Filter data based on the selected sector
+        df_filtered = df[df['Sector'] == selected_sector]
 
-    # Plot
-    st.write("### Yield Forecasting")
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
-    # Training data
-    ax.plot(grouped_data['Sale Date'], grouped_data['Avg_YLD_USD'], marker='o', linestyle='-', label='Training Data')
-    
-    # Forecast
-    forecast_dates = pd.date_range(start=forecast_start, periods=forecast_period, freq='D')
-    ax.plot(forecast_dates, forecast, marker='o', linestyle='-', color='red', label='Forecast')
+        # Section 2: Group and create features
+        df_grouped = df_filtered.groupby("Sale Date", as_index=False).agg(
+            Avg_YLD_USD=("YLD USD", "mean"),
+            Sum_PAX=("PAX COUNT", "sum")
+        )
 
-    ax.set_xlabel('Sale Date')
-    ax.set_ylabel('YLD USD')
-    ax.legend()
-    ax.set_title('Training Data and Forecast')
-    st.pyplot(fig)
+        df_grouped['Days_Before_Dep'] = (departure_date - df_grouped["Sale Date"]).dt.days
+        df_grouped = df_grouped[df_grouped['Days_Before_Dep'] > 0]
 
-    # Comparison table
-    st.write("### Forecast vs Actual Data")
-    forecasted_vs_actual = pd.DataFrame({
-        'Sale Date': forecast_dates[:len(grouped_data)],
-        'Forecasted': forecast[:len(grouped_data)],
-        'Actual': grouped_data['Avg_YLD_USD'].values[:len(forecast)]
-    })
-    st.dataframe(forecasted_vs_actual)
+        df_grouped['Days_Before_Dep_Squared'] = df_grouped['Days_Before_Dep'] ** 2
+        df_grouped['PAX_YLD_Product'] = df_grouped['Sum_PAX'] * df_grouped['Avg_YLD_USD']
+
+        for lag in [1, 2, 3, 5, 7]:  # Add lag features for selected days
+            df_grouped[f"Lag_{lag}"] = df_grouped["Avg_YLD_USD"].shift(lag)
+
+        # Add Moving Averages
+        df_grouped["MA_3"] = df_grouped["Avg_YLD_USD"].rolling(window=3).mean()
+        df_grouped["MA_7"] = df_grouped["Avg_YLD_USD"].rolling(window=7).mean()
+
+        # Add Exponential Weighted Moving Averages
+        df_grouped["EWMA_3"] = df_grouped["Avg_YLD_USD"].ewm(span=3, adjust=False).mean()
+        df_grouped["EWMA_7"] = df_grouped["Avg_YLD_USD"].ewm(span=7, adjust=False).mean()
+
+        # Drop NaNs caused by shifting and rolling
+        df_grouped = df_grouped.dropna()
+
+        # Section 3: Time series plot
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(
+            x=df_grouped['Sale Date'],
+            y=df_grouped['Avg_YLD_USD'],
+            mode='lines',
+            name='Average Yield (USD)'
+        ))
+
+        fig.update_layout(
+            title=f"Time Series of Average Yield for {selected_sector}",
+            xaxis_title="Sale Date",
+            yaxis_title="Average Yield (USD)",
+            template="plotly_dark"
+        )
+
+        st.plotly_chart(fig)
+
+        # Section 4: Prepare data for Exponential Smoothing
+
+        # Filter data up to the forecast period start date
+        df_forecast_data = df_grouped[df_grouped['Sale Date'] <= pd.Timestamp(forecast_period_start)]
+
+        # Train Exponential Smoothing model on the data up to forecast_period_start
+        y_train = df_forecast_data["Avg_YLD_USD"]
+
+        # Hyperparameter tuning for Exponential Smoothing
+        seasonal_periods_list = [7, 30]  # Weekly and monthly seasonality
+        trend_types = ['add', 'mul']
+        seasonal_types = ['add', 'mul']
+
+        best_model = None
+        best_rmse = float('inf')
+
+        for trend, seasonal, seasonal_periods in product(trend_types, seasonal_types, seasonal_periods_list):
+            try:
+                exp_smooth_model = ExponentialSmoothing(
+                    y_train, 
+                    trend=trend, 
+                    seasonal=seasonal, 
+                    seasonal_periods=seasonal_periods
+                )
+                exp_smooth_model_fit = exp_smooth_model.fit()
+                
+                # Calculate RMSE to evaluate the model
+                y_pred_train = exp_smooth_model_fit.fittedvalues
+                rmse = mean_absolute_error(y_train, y_pred_train)
+                
+                # Select the best model based on RMSE
+                if rmse < best_rmse:
+                    best_rmse = rmse
+                    best_model = exp_smooth_model_fit
+                    best_params = (trend, seasonal, seasonal_periods)
+            except Exception as e:
+                continue  # In case of any errors (e.g., singular matrix)
+
+        # Output the best parameters
+        st.write(f"Best model parameters: Trend = {best_params[0]}, Seasonal = {best_params[1]}, Seasonal Periods = {best_params[2]}")
+
+        # Forecast from the forecast start date to the departure date
+        forecast_dates = pd.date_range(forecast_period_start, departure_date, freq='D')
+        y_pred_es = best_model.forecast(len(forecast_dates))
+
+        # Create a DataFrame for the forecast predictions
+        forecast_df = pd.DataFrame({
+            "Sale Date": forecast_dates,
+            "Predicted Yield (Exp Smoothing)": y_pred_es
+        })
+
+        # Merge forecast predictions with actual data (if available)
+        actual_data = df_grouped[df_grouped['Sale Date'].isin(forecast_dates)]
+
+        # Create a table with actual and predicted values
+        forecast_table = pd.merge(actual_data[['Sale Date', 'Avg_YLD_USD']], forecast_df, on="Sale Date", how="left")
+        forecast_table.rename(columns={"Avg_YLD_USD": "Actual Yield (USD)"}, inplace=True)
+
+        # Display the actual vs predicted table
+        st.write("Actual vs Predicted Yield Table", forecast_table)
+
+        # Plot the actual vs predicted yields for the forecast period
+        fig_pred = go.Figure()
+
+        fig_pred.add_trace(go.Scatter(
+            x=df_grouped['Sale Date'],
+            y=df_grouped['Avg_YLD_USD'],
+            mode='lines',
+            name='Actual Yield'
+        ))
+
+        fig_pred.add_trace(go.Scatter(
+            x=forecast_df["Sale Date"],
+            y=forecast_df["Predicted Yield (Exp Smoothing)"],
+            mode='lines',
+            name="Predicted Yield (Exp Smoothing)",
+            line=dict(dash="dash")
+        ))
+
+        fig_pred.update_layout(
+            title="Actual vs Predicted Average Yield (Exp Smoothing)",
+            xaxis_title="Sale Date",
+            yaxis_title="Average Yield (USD)",
+            template="plotly_dark"
+        )
+
+        st.plotly_chart(fig_pred)
