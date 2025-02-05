@@ -8,7 +8,7 @@ from itertools import product
 
 # Streamlit page configuration
 st.set_page_config(
-    page_title="Average Yield Forecasting",
+    page_title="Forecasting Dashboard",
     page_icon=":chart_with_upwards_trend:",
     layout="wide"
 )
@@ -150,7 +150,7 @@ if uploaded_file:
         st.write(f"Best model parameters: Trend = {best_params[0]}, Seasonal = {best_params[1]}, Seasonal Periods = {best_params[2]}")
 
         # Forecast from the forecast start date to the departure date
-        forecast_dates = pd.date_range(forecast_period_start, departure_date, freq='D')
+        forecast_dates = pd.date_range(forecast_period_start, forecast_period_end, freq='D')
         y_pred_es = best_model.forecast(len(forecast_dates))
 
         # Create a DataFrame for the forecast predictions
