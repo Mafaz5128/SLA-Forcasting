@@ -75,20 +75,24 @@ if uploaded_file:
                 except:
                     continue
             
-            forecast_dates = pd.date_range(forecast_period_start, forecast_period_end, freq='D')
-            y_pred_es = best_model.forecast(len(forecast_dates))
-            
-            forecast_results.append(pd.DataFrame({
-                "Sector": selected_sector,
-                "Sale Date": forecast_dates,
-                "Predicted Yield (Exp Smoothing)": y_pred_es
-            }))
-            
-        final_forecast_df = pd.concat(forecast_results)
-        st.write("### Sector-wise Predicted Yield Forecast")
-        st.dataframe(final_forecast_df)
+            if best_model is not None:
+                forecast_dates = pd.date_range(forecast_period_start, forecast_period_end, freq='D')
+                y_pred_es = best_model.forecast(len(forecast_dates))
+                
+                forecast_results.append(pd.DataFrame({
+                    "Sector": selected_sector,
+                    "Sale Date": forecast_dates,
+                    "Predicted Yield (Exp Smoothing)": y_pred_es
+                }))
+            else:
+                st.warning(f"No suitable model found for sector: {selected_sector}. Skipping forecast.")
         
-        avg_yield_per_sector = final_forecast_df.groupby("Sector")["Predicted Yield (Exp Smoothing)"].mean().reset_index()
-        avg_yield_per_sector.columns = ["Sector", "Average Predicted Yield (USD)"]
-        st.write("### Sector-wise Average Predicted Yield Table")
-        st.table(avg_yield_per_sector)
+        if forecast_results:
+            final_forecast_df = pd.concat(forecast_results)
+            st.write("### Sector-wise Predicted Yield Forecast")
+            st.dataframe(final_forecast_df)
+            
+            avg_yield_per_sector = final_forecast_df.groupby("Sector")["Predicted Yield (Exp Smoothing)"].mean().reset_index()
+            avg_yield_per_sector.columns = ["Sector", "Average Predicted Yield (USD)"]
+            st.write("### Sector-wise Average Predicted Yield Table")
+            st.table(avg_yield_per_sector)
