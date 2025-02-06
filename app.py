@@ -90,10 +90,6 @@ if uploaded_file:
             avg_yield_per_sector = final_forecast_df.groupby("Sector")["Predicted Yield (Exp Smoothing)"].mean().reset_index()
             avg_yield_per_sector.columns = ["Sector", "Average Predicted Yield (USD)"]
             
-            # Display table in Streamlit UI
-            st.write("### Sector-wise Average Predicted Yield Table")
-            st.table(avg_yield_per_sector)
-            
             # Convert the DataFrame to an in-memory Excel file
             def convert_df_to_excel(df):
                 # Create a BytesIO buffer
