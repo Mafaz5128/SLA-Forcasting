@@ -25,9 +25,6 @@ if uploaded_file:
     # Get unique sectors
     sectors = df['Sector'].unique()
     
-    # Store results
-    sector_avg_yield = []
-    
     flight_dates = sorted(df['Flight Date'].unique())
     departure_date = st.selectbox('Select Departure Date', flight_dates)
     departure_date = pd.to_datetime(departure_date)
@@ -84,13 +81,9 @@ if uploaded_file:
                     "Sale Date": forecast_dates,
                     "Predicted Yield (Exp Smoothing)": y_pred_es
                 }))
-            else:
-                st.warning(f"No suitable model found for sector: {selected_sector}. Skipping forecast.")
         
         if forecast_results:
             final_forecast_df = pd.concat(forecast_results)
-            st.write("### Sector-wise Predicted Yield Forecast")
-            st.dataframe(final_forecast_df)
             
             avg_yield_per_sector = final_forecast_df.groupby("Sector")["Predicted Yield (Exp Smoothing)"].mean().reset_index()
             avg_yield_per_sector.columns = ["Sector", "Average Predicted Yield (USD)"]
