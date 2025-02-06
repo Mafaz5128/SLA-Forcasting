@@ -28,29 +28,31 @@ if uploaded_file:
     # Store results
     sector_avg_yield = []
     
-    for selected_sector in sectors:
-        df_filtered = df[df['Sector'] == selected_sector]
+    flight_dates = sorted(df['Flight Date'].unique())
+    departure_date = st.selectbox('Select Departure Date', flight_dates)
+    departure_date = pd.to_datetime(departure_date)
+    
+    last_sale_date = df['Sale Date'].max()
+    forecast_window_start = max(last_sale_date, departure_date - pd.Timedelta(days=90))
+    
+    forecast_period_start = st.date_input(
+        "Select Forecast Start Date",
+        min_value=forecast_window_start,
+        max_value=departure_date
+    )
+    
+    forecast_period_end = st.date_input(
+        "Select Forecast End Date",
+        min_value=forecast_period_start,
+        max_value=departure_date
+    )
+    
+    if st.button("Generate Forecast"):
+        forecast_results = []
         
-        flight_dates = sorted(df_filtered['Flight Date'].unique())
-        departure_date = st.selectbox(f'Select Departure Date for {selected_sector}', flight_dates)
-        departure_date = pd.to_datetime(departure_date)
-        
-        last_sale_date = df_filtered['Sale Date'].max()
-        forecast_window_start = max(last_sale_date, departure_date - pd.Timedelta(days=90))
-        
-        forecast_period_start = st.date_input(
-            f"Select Forecast Start Date for {selected_sector}",
-            min_value=forecast_window_start,
-            max_value=departure_date
-        )
-        
-        forecast_period_end = st.date_input(
-            f"Select Forecast End Date for {selected_sector}",
-            min_value=forecast_period_start,
-            max_value=departure_date
-        )
-        
-        if st.button(f"Generate Forecast for {selected_sector}"):
+        for selected_sector in sectors:
+            df_filtered = df[df['Sector'] == selected_sector]
+            
             df_grouped = df_filtered.groupby("Sale Date", as_index=False).agg(
                 Avg_YLD_USD=("YLD USD", "mean")
             )
@@ -76,14 +78,17 @@ if uploaded_file:
             forecast_dates = pd.date_range(forecast_period_start, forecast_period_end, freq='D')
             y_pred_es = best_model.forecast(len(forecast_dates))
             
-            forecast_df = pd.DataFrame({
+            forecast_results.append(pd.DataFrame({
+                "Sector": selected_sector,
                 "Sale Date": forecast_dates,
                 "Predicted Yield (Exp Smoothing)": y_pred_es
-            })
+            }))
             
-            avg_yield = forecast_df["Predicted Yield (Exp Smoothing)"].mean()
-            sector_avg_yield.append({"Sector": selected_sector, "Average Predicted Yield (USD)": avg_yield})
-    
-    if sector_avg_yield:
+        final_forecast_df = pd.concat(forecast_results)
+        st.write("### Sector-wise Predicted Yield Forecast")
+        st.dataframe(final_forecast_df)
+        
+        avg_yield_per_sector = final_forecast_df.groupby("Sector")["Predicted Yield (Exp Smoothing)"].mean().reset_index()
+        avg_yield_per_sector.columns = ["Sector", "Average Predicted Yield (USD)"]
         st.write("### Sector-wise Average Predicted Yield Table")
-        st.table(pd.DataFrame(sector_avg_yield))
+        st.table(avg_yield_per_sector)
