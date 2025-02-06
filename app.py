@@ -96,3 +96,17 @@ if uploaded_file:
             avg_yield_per_sector.columns = ["Sector", "Average Predicted Yield (USD)"]
             st.write("### Sector-wise Average Predicted Yield Table")
             st.table(avg_yield_per_sector)
+            
+            # Download Button
+            @st.cache_data
+            def convert_df_to_excel(df):
+                # Convert the DataFrame to Excel format
+                return df.to_excel(index=False, engine='openpyxl')
+            
+            excel_file = convert_df_to_excel(avg_yield_per_sector)
+            st.download_button(
+                label="Download Sector-wise Average Predicted Yield Table",
+                data=excel_file,
+                file_name="sector_average_predicted_yield.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
