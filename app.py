@@ -45,7 +45,8 @@ if uploaded_file:
         max_value=departure_date
     )
     
-    if st.button("Generate Forecast"):
+    # Button to trigger forecast and download
+    if st.button("Download"):
         forecast_results = []
         
         for selected_sector in sectors:
@@ -88,6 +89,8 @@ if uploaded_file:
             
             avg_yield_per_sector = final_forecast_df.groupby("Sector")["Predicted Yield (Exp Smoothing)"].mean().reset_index()
             avg_yield_per_sector.columns = ["Sector", "Average Predicted Yield (USD)"]
+            
+            # Display table in Streamlit UI
             st.write("### Sector-wise Average Predicted Yield Table")
             st.table(avg_yield_per_sector)
             
