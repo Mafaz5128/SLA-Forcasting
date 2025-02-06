@@ -90,12 +90,11 @@ if uploaded_file:
             st.write("### Sector-wise Average Predicted Yield Table")
             st.table(avg_yield_per_sector)
             
-            # Download Button
-            @st.cache_data
+            # Function to convert dataframe to Excel format without caching
             def convert_df_to_excel(df):
-                # Convert the DataFrame to Excel format
                 return df.to_excel(index=False, engine='openpyxl')
-            
+
+            # Convert the dataframe to Excel and create the download button
             excel_file = convert_df_to_excel(avg_yield_per_sector)
             st.download_button(
                 label="Download Sector-wise Average Predicted Yield Table",
