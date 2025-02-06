@@ -5,6 +5,7 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from sklearn.metrics import mean_absolute_error
 from itertools import product
 import numpy as np
+from io import BytesIO
 
 # Streamlit page configuration
 st.set_page_config(
@@ -90,12 +91,19 @@ if uploaded_file:
             st.write("### Sector-wise Average Predicted Yield Table")
             st.table(avg_yield_per_sector)
             
-            # Function to convert dataframe to Excel format without caching
+            # Convert the DataFrame to an in-memory Excel file
             def convert_df_to_excel(df):
-                return df.to_excel(index=False, engine='openpyxl')
+                # Create a BytesIO buffer
+                buffer = BytesIO()
+                with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+                    df.to_excel(writer, index=False, sheet_name="Forecast Data")
+                buffer.seek(0)  # Rewind the buffer to the beginning
+                return buffer
 
-            # Convert the dataframe to Excel and create the download button
+            # Create the Excel file
             excel_file = convert_df_to_excel(avg_yield_per_sector)
+
+            # Create the download button
             st.download_button(
                 label="Download Sector-wise Average Predicted Yield Table",
                 data=excel_file,
