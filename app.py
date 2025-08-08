@@ -1,111 +1,208 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+#import plotly.graph_objects as go
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
-from sklearn.metrics import mean_absolute_error
-from itertools import product
-import numpy as np
-from io import BytesIO
+from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error
+import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import os
 
-# Streamlit page configuration
-st.set_page_config(
-    page_title="Forecasting Dashboard",
-    page_icon=":chart_with_upwards_trend:",
-    layout="wide"
-)
-st.header("Sector-wise Average Yield Prediction")
 
-# File upload section
+#st.set_page_config(page_title="Forecast The Fare", layout="wide")
+
+# Set custom CSS for background color
+def load_css():
+    with open(os.path.join(os.path.dirname(__file__), 'style.css')) as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+# Set page configuration
+st.set_page_config(page_title="Forecast The Fare", layout="wide")
+
+# Apply custom CSS
+load_css()
+
+# Title for the app
+st.title("Fare Forecasting")
+
+
+# File uploader
 uploaded_file = st.file_uploader("Upload your Excel file", type=["xlsx"])
 
-if uploaded_file:
-    df = pd.read_excel(uploaded_file)
-    df["Sale Date"] = pd.to_datetime(df["Sale Date"])
-    df["Flight Date"] = pd.to_datetime(df["Flight Date"])
-    
-    # Get unique sectors
-    sectors = df['Sector'].unique()
-    
-    flight_dates = sorted(df['Flight Date'].unique())
-    departure_date = st.selectbox('Select Departure Date', flight_dates)
-    departure_date = pd.to_datetime(departure_date)
-    
-    last_sale_date = df['Sale Date'].max()
-    forecast_window_start = max(last_sale_date, departure_date - pd.Timedelta(days=90))
-    
-    forecast_period_start = st.date_input(
-        "Select Forecast Start Date",
-        min_value=forecast_window_start,
-        max_value=departure_date
-    )
-    
-    forecast_period_end = st.date_input(
-        "Select Forecast End Date",
-        min_value=forecast_period_start,
-        max_value=departure_date
-    )
-    
-    # Button to trigger forecast and download
-    if st.button("Download"):
-        forecast_results = []
-        
-        for selected_sector in sectors:
-            df_filtered = df[df['Sector'] == selected_sector]
-            
-            df_grouped = df_filtered.groupby("Sale Date", as_index=False).agg(
-                Avg_YLD_USD=("YLD USD", "mean")
-            )
-            
-            df_forecast_data = df_grouped[df_grouped['Sale Date'] <= pd.Timestamp(forecast_period_start)]
-            y_train = df_forecast_data["Avg_YLD_USD"]
-            
-            best_model = None
-            best_rmse = float('inf')
-            
-            for trend, seasonal, seasonal_periods in product(['add', 'mul'], ['add', 'mul'], [7, 30]):
-                try:
-                    model = ExponentialSmoothing(y_train, trend=trend, seasonal=seasonal, seasonal_periods=seasonal_periods)
-                    model_fit = model.fit()
-                    rmse = mean_absolute_error(y_train, model_fit.fittedvalues)
-                    
-                    if rmse < best_rmse:
-                        best_rmse = rmse
-                        best_model = model_fit
-                except:
-                    continue
-            
-            if best_model is not None:
-                forecast_dates = pd.date_range(forecast_period_start, forecast_period_end, freq='D')
-                y_pred_es = best_model.forecast(len(forecast_dates))
-                
-                forecast_results.append(pd.DataFrame({
-                    "Sector": selected_sector,
-                    "Sale Date": forecast_dates,
-                    "Predicted Yield (Exp Smoothing)": y_pred_es
-                }))
-        
-        if forecast_results:
-            final_forecast_df = pd.concat(forecast_results)
-            
-            avg_yield_per_sector = final_forecast_df.groupby("Sector")["Predicted Yield (Exp Smoothing)"].mean().reset_index()
-            avg_yield_per_sector.columns = ["Sector", "Average Predicted Yield (USD)"]
-            
-            # Convert the DataFrame to an in-memory Excel file
-            def convert_df_to_excel(df):
-                # Create a BytesIO buffer
-                buffer = BytesIO()
-                with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-                    df.to_excel(writer, index=False, sheet_name="Forecast Data")
-                buffer.seek(0)  # Rewind the buffer to the beginning
-                return buffer
+if uploaded_file is not None:
+    # Load the Excel file and get available sheet names
+    excel_file = pd.ExcelFile(uploaded_file)
+    sheet_names = excel_file.sheet_names
 
-            # Create the Excel file
-            excel_file = convert_df_to_excel(avg_yield_per_sector)
+    # Add a dropdown to select a sheet
+    selected_sheet = st.selectbox("Select a sheet", sheet_names)
 
-            # Create the download button
-            st.download_button(
-                label="Download Sector-wise Average Predicted Yield Table",
-                data=excel_file,
-                file_name="sector_average_predicted_yield.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    # Load the selected sheet
+    df = pd.read_excel(uploaded_file, sheet_name=selected_sheet)
+
+    # Check if required columns exist
+    if 'Sector' not in df.columns or 'Sale Date' not in df.columns or 'YLD USD' not in df.columns or 'PAX COUNT' not in df.columns:
+        st.error("The dataset must contain 'Sector', 'Sale Date', 'YLD USD', and 'PAX COUNT' columns.")
+    else:
+        # Extract unique sectors
+        sectors = df['Sector'].unique()
+
+        # Add a dropdown button for selecting a sector
+        selected_sector = st.selectbox("Select a sector", sectors)
+
+        # Filter the dataset based on the selected sector
+        filtered_df = df[df['Sector'] == selected_sector]
+
+        # Ensure Sale Date is in datetime format
+        filtered_df['Sale Date'] = pd.to_datetime(filtered_df['Sale Date'], errors='coerce')
+        filtered_df['Flight Date'] = pd.to_datetime(filtered_df['Flight Date'], errors='coerce')
+
+        date = df['Flight Date'].unique()
+
+        # Add a dropdown button for selecting a sector
+        departure_date = st.selectbox("Select a daparture date", date )
+
+        #departure_date = pd.to_datetime('2024-11-01')
+        filtered_df["Days Before Departure"] = (departure_date - filtered_df["Sale Date"]).dt.days
+
+        # Handle missing Sale Date values
+        filtered_df = filtered_df.dropna(subset=['Sale Date'])
+
+        # Aggregate data
+        aggregated_data = (
+            filtered_df.groupby('Sale Date')
+            .agg(
+                Average_Yield=('YLD USD', 'mean'),
+                Sum_Pax_Count=('PAX COUNT', 'sum'),
+                Average_Days_Before_Departure=('Days Before Departure', 'mean')
             )
+            .reset_index()
+        )
+
+        # Create columns for the tabs
+        tab1, tab2 = st.tabs(["📈 Revenue Chart", "🗃 Data Table"])
+
+        with tab2:
+            # Display the Data Table
+            #st.write(f"Data Table for Sector: {selected_sector}")
+            #st.dataframe(filtered_df)
+
+            # Optionally, show the aggregated data if needed
+            st.write("Aggregated Data (Average Yield, Pax Count):")
+            st.dataframe(aggregated_data)
+
+
+        with tab1:
+            # Plot Revenue Chart: Average Yield and Pax Count
+            col1, col2 = st.columns(2)
+
+            with col1:
+                # Plot 1: Average Yield
+                fig_yield = go.Figure()
+                fig_yield.add_trace(
+                    go.Scatter(
+                        x=aggregated_data['Sale Date'],
+                        y=aggregated_data['Average_Yield'],
+                        mode='lines+markers',
+                        name='Average Yield (USD)',
+                        line=dict(color='blue')
+                    )
+                )
+                fig_yield.update_layout(
+                    title=f"Average Yield Over Time (Sector: {selected_sector})",
+                    xaxis_title="Sale Date",
+                    yaxis_title="Average Yield (USD)",
+                    template="plotly_white"
+                )
+                st.plotly_chart(fig_yield)
+
+            with col2:
+                # Plot 2: Pax Count
+                fig_pax = go.Figure()
+                fig_pax.add_trace(
+                    go.Scatter(
+                        x=aggregated_data['Sale Date'],
+                        y=aggregated_data['Sum_Pax_Count'],
+                        mode='lines+markers',
+                        name='Pax Count',
+                        line=dict(color='orange')
+                    )
+                )
+                fig_pax.update_layout(
+                    title=f"Pax Count Over Time (Sector: {selected_sector})",
+                    xaxis_title="Sale Date",
+                    yaxis_title="Pax Count",
+                    template="plotly_white"
+                )
+                st.plotly_chart(fig_pax)
+
+       
+
+            # Train-Test Split (up to November for train, November for test)
+            cutoff_date = departure_date 
+            train_data = aggregated_data[aggregated_data['Sale Date'] < cutoff_date]
+            test_data = aggregated_data[aggregated_data['Sale Date'] >= cutoff_date]
+
+            # Apply Exponential Smoothing on the train data
+            model = ExponentialSmoothing(
+                train_data['Average_Yield'], 
+                trend='add', 
+                seasonal='add', 
+                seasonal_periods=12  # Assumes monthly data, so seasonality period is 12 months
+            )
+            model_fit = model.fit()
+
+            # Forecast the next period(s) (November in this case)
+            forecast = model_fit.forecast(len(test_data))
+
+            # Plot the training data, test data, and forecasted values
+            fig = go.Figure()
+
+            # Add Training Data trace
+            fig.add_trace(
+                go.Scatter(
+                    x=train_data['Sale Date'],
+                    y=train_data['Average_Yield'],
+                    mode='lines+markers',
+                    name='Training Data (Actual)',
+                    line=dict(color='blue')
+                )
+            )
+
+            # Add Test Data trace
+            fig.add_trace(
+                go.Scatter(
+                    x=test_data['Sale Date'],
+                    y=test_data['Average_Yield'],
+                    mode='lines+markers',
+                    name='Test Data (Actual)',
+                    line=dict(color='orange')
+                )
+            )
+
+            # Add Forecasted Data trace
+            fig.add_trace(
+                go.Scatter(
+                    x=test_data['Sale Date'],
+                    y=forecast,
+                    mode='lines+markers',
+                    name='Forecasted Data',
+                    line=dict(color='green', dash='dot')
+                )
+            )
+
+            # Update layout
+            fig.update_layout(
+                title=f"Training, Test, and Forecasted Average Yield for Sector: {selected_sector}",
+                xaxis_title="Sale Date",
+                yaxis_title="Average Yield (USD)",
+                template="plotly_white"
+            )
+
+            st.plotly_chart(fig)
+
+            # Calculate forecast accuracy (optional)
+            if not test_data.empty:
+                mae = mean_absolute_error(test_data['Average_Yield'], forecast)
+                mape = (mean_absolute_percentage_error(test_data['Average_Yield'], forecast)) * 100
+                st.write(f"Mean Absolute Error (MAE): {mae:.2f}")
+                st.write(f"Mean Absolute Percentage Error (MAPE): {mape:.2f}%")
